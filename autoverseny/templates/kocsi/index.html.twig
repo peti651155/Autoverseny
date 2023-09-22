@@ -1,0 +1,43 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Auto index{% endblock %}
+
+{% block body %}
+    <h1>Auto index</h1>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>Model</th>
+                <th>ManufactureYear</th>
+                <th>Power</th>
+                <th>Weight</th>
+                <th>DeletedAt</th>
+                <th>actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for auto in autos %}
+            <tr>
+                <td>{{ auto.id }}</td>
+                <td>{{ auto.model }}</td>
+                <td>{{ auto.manufactureYear }}</td>
+                <td>{{ auto.power }}</td>
+                <td>{{ auto.weight }}</td>
+                <td>{{ auto.deletedAt ? auto.deletedAt|date('Y-m-d H:i:s') : '' }}</td>
+                <td>
+                    <a href="{{ path('app_kocsi_show', {'id': auto.id}) }}">show</a>
+                    <a href="{{ path('app_kocsi_edit', {'id': auto.id}) }}">edit</a>
+                </td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="7">no records found</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <a href="{{ path('app_kocsi_new') }}">Create new</a>
+{% endblock %}

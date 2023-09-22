@@ -1,0 +1,13 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Edit Auto{% endblock %}
+
+{% block body %}
+    <h1>Edit Auto</h1>
+
+    {{ include('kocsi/_form.html.twig', {'button_label': 'Update'}) }}
+
+    <a href="{{ path('app_kocsi_index') }}">back to list</a>
+
+    {{ include('kocsi/_delete_form.html.twig') }}
+{% endblock %}

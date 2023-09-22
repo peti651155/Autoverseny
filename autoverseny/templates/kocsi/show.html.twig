@@ -1,0 +1,42 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Auto{% endblock %}
+
+{% block body %}
+    <h1>Auto</h1>
+
+    <table class="table">
+        <tbody>
+            <tr>
+                <th>Id</th>
+                <td>{{ auto.id }}</td>
+            </tr>
+            <tr>
+                <th>Model</th>
+                <td>{{ auto.model }}</td>
+            </tr>
+            <tr>
+                <th>ManufactureYear</th>
+                <td>{{ auto.manufactureYear }}</td>
+            </tr>
+            <tr>
+                <th>Power</th>
+                <td>{{ auto.power }}</td>
+            </tr>
+            <tr>
+                <th>Weight</th>
+                <td>{{ auto.weight }}</td>
+            </tr>
+            <tr>
+                <th>DeletedAt</th>
+                <td>{{ auto.deletedAt ? auto.deletedAt|date('Y-m-d H:i:s') : '' }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <a href="{{ path('app_kocsi_index') }}">back to list</a>
+
+    <a href="{{ path('app_kocsi_edit', {'id': auto.id}) }}">edit</a>
+
+    {{ include('kocsi/_delete_form.html.twig') }}
+{% endblock %}

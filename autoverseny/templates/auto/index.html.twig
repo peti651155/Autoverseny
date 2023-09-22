@@ -1,0 +1,419 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Auto list{% endblock %}
+
+{% block body %}
+<div class="container mt-5">
+    <center><h1>Autó lista</h1></center>
+
+    <button id="addAuto" class="btn btn-primary mb-3">Autó hozzáadása</button>
+    <button id="raceModeButton" class="btn btn-primary mb-3">Versenyezni szeretnék</button>
+    <button id="editModeButton" class="btn btn-primary mb-3" style="display:none;">Szerkesztés</button>
+    <button id="raceButton" class="btn btn-danger mb-3" style="display:none;">verseny indítás</button>
+
+    <table class="table table-striped">
+        <thead class="thead-dark"> 
+            <tr>
+                <th></th>
+                <th>Modell</th>
+                <th>Gyártási év</th>
+                <th>Lóerő</th>
+                <th>Súly</th>
+                <th colspan="3">Műveletek</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for auto in autos %}
+            <tr data-id="{{ auto.id }}">
+                <td><input type="checkbox" class="car-checkbox" style="display:none;"></td>
+                <td data-field="model">{{ auto.model }}</td>
+                <td data-field="manufactureYear">{{ auto.manufactureYear }}</td>
+                <td data-field="power">{{ auto.power }}</td>
+                <td data-field="weight">{{ auto.weight }}</td>
+                <td>
+                    <a href="{{ path('auto_soft_delete', {'id': auto.id}) }}" class="btn btn-danger">Delete</a>
+                </td>
+                <td>
+                    <button class="btn btn-primary save" style="display:none;">Mentés</button>
+                    <button class="btn btn-secondary cancel" style="display:none;">Mégse</button>
+                    <button class="btn btn-warning edit">Szerkesztés</button>
+                </td>
+                <td>
+                    {% if not auto.imageName %}
+                        <button class="btn btn-small btn-primary toggle-upload-form">Képfeltöltés</button>
+                        
+                        <div class="upload-form" style="display: none;">
+                            <form method="post" action="{{ path('auto_add_image', {'id': auto.id}) }}" enctype="multipart/form-data">
+                                <input type="file" name="car_image" accept=".png, .jpg, .jpeg">
+                                <button type="submit" class="btn btn-small btn-primary">Feltölt</button>
+                            </form>
+                        </div>
+
+                    {% endif %}
+
+                    {% if auto.imageName %}
+                        <img src="{{ asset('images/' ~ auto.imageName) }}" alt="Auto image" width="100px" class="car-image" style="display: none;"> 
+                        <button class="btn btn-small btn-danger delete-image">Kép törlése</button>
+                        <button class="btn btn-small btn-warning toggle-upload-form">Kép cseréje</button>
+                        
+                        <div class="upload-form" style="display: none;">
+                            <form method="post" action="{{ path('auto_replace_image', {'id': auto.id}) }}" enctype="multipart/form-data">
+                                <input type="file" name="car_image" accept=".png, .jpg, .jpeg">
+                                <button type="submit" class="btn btn-small btn-primary">Cserél</button>
+                            </form>
+                        </div>
+                    {% endif %}
+
+                </td>
+
+
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="6" class="text-center">No autos found</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+<!-- Modal -->
+<div class="modal fade" id="winnerModal" tabindex="-1" aria-labelledby="winnerModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="winnerModalLabel">Verseny eredménye</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p id="winnerText">A versenyt a következő autó nyerte: <br /></p>
+        <img id="winnerImage" src="" alt="Winner car image" width="100px" style="display: none;">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Bezárás</button>
+        
+      </div>
+    </div>
+  </div>
+</div>
+
+
+{% block javascripts %}
+<script>
+
+    document.addEventListener('DOMContentLoaded', function() {
+    const deleteImageButtons = document.querySelectorAll('.delete-image');
+
+    deleteImageButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const row = this.closest('tr');
+            const id = row.dataset.id;
+
+            fetch(`/auto/${id}/delete-image`, {
+                method: 'DELETE',
+            }).then(response => response.json()).then(result => {
+                if (result.success) {
+                    console.log("Sikeres képtörlés!");
+                    location.reload(); // Frissítse az oldalt, hogy a változásokat láthassa.
+                } else {
+                    console.error("Hiba a kép törlése során.");
+                }
+            });
+        });
+    });
+});
+
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const rows = document.querySelectorAll('table tbody tr');
+
+        const uploadButtons = document.querySelectorAll('.toggle-upload-form');
+        uploadButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const form = this.nextElementSibling; // Referencia az űrlap elemhez
+                form.style.display = form.style.display === 'none' ? 'block' : 'none'; // Az űrlap megjelenítése/elrejtése
+            });
+        });
+        
+        rows.forEach(row => {
+            const editButton = row.querySelector('.edit');
+            const saveButton = row.querySelector('.save');
+            const cancelButton = row.querySelector('.cancel');
+
+            editButton.addEventListener('click', function() {
+                toggleEditMode(row, true);
+            });
+
+            saveButton.addEventListener('click', function() {
+                saveChanges(row);
+                toggleEditMode(row, false);
+            });
+
+            cancelButton.addEventListener('click', function() {
+                toggleEditMode(row, false);
+            });
+        });
+    });  
+
+    function toggleEditMode(row, editMode) {
+        // Módosított sor a mezők kiválasztásához:
+        const fields = row.querySelectorAll('td[data-field]');
+        const editButton = row.querySelector('.edit');
+        const saveButton = row.querySelector('.save');
+        const cancelButton = row.querySelector('.cancel');
+
+        fields.forEach(field => field.contentEditable = editMode);
+
+        if (editMode) {
+            editButton.style.display = 'none';
+            saveButton.style.display = 'block';
+            cancelButton.style.display = 'block';
+        } else {
+            editButton.style.display = 'block';
+            saveButton.style.display = 'none';
+            cancelButton.style.display = 'none';
+        }
+    }
+
+    function saveChanges(row) {
+        const id = row.dataset.id;
+        const fields = row.querySelectorAll('td[data-field]');
+        let data = {};
+
+        fields.forEach(field => {
+            const fieldName = field.dataset.field;
+            data[fieldName] = field.textContent;
+        });
+
+        // AJAX kérés küldése a szerverre a módosításokkal:
+        fetch(`/auto/${id}/edit-inline`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        }).then(response => response.json()).then(result => {
+            if (result.success) {
+                console.log("Sikeres módosítás!");
+            } else {
+                console.error("Hiba a módosítás során.");
+            }
+        });
+    };
+    document.getElementById('addAuto').addEventListener('click', function() {
+    addNewRow();
+    });
+
+    function addNewRow() {
+    const table = document.querySelector('table tbody');
+    const newRow = table.insertRow(0);
+    newRow.dataset.id = 'new';
+
+    // Adjuk hozzá az új cellákat és mezőket:
+    const fields = ['','model', 'manufactureYear', 'power', 'weight'];
+    fields.forEach(field => {
+        const cell = newRow.insertCell();
+        cell.contentEditable = true;
+        cell.dataset.field = field;
+    });
+
+    // Mentés gomb hozzáadása:
+    const saveButtonCell = newRow.insertCell();
+    let saveButton = document.createElement('button');
+    saveButton.innerText = 'Mentés';
+    saveButton.className = 'btn btn-success';
+    saveButton.addEventListener('click', function() {
+        saveNewAuto(newRow);
+    });
+    saveButtonCell.appendChild(saveButton);
+
+    let cancelButton = document.createElement('button');
+    cancelButton.innerText = 'Mégse';
+    cancelButton.className = 'btn btn-secondary';
+    cancelButton.addEventListener('click', function() {
+        cancelNewAuto(newRow);
+    });
+    saveButtonCell.appendChild(cancelButton);
+
+
+    // Szerkesztés gomb nem szükséges az új sorhoz, így csak egy üres cellát adunk hozzá:
+    newRow.insertCell();
+
+    // Most, hogy hozzáadtuk az új sort, állítsuk be szerkesztési módba:
+    toggleEditMode(newRow, true);
+    }
+    function cancelNewAuto(row) {
+    row.remove();
+}
+    function saveNewAuto(row) {
+    const fields = row.querySelectorAll('[contenteditable]');
+    let data = {};
+
+    fields.forEach(field => {
+        const fieldName = field.dataset.field;
+        data[fieldName] = field.textContent;
+    });
+
+    // AJAX kérés küldése a szerverre az új autó adatokkal:
+    fetch('/auto/add', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+    }).then(response => response.json()).then(result => {
+        if (result.success) {
+            console.log("Sikeres autó hozzáadás!");
+            location.reload(); // Frissítse az oldalt az új adatokkal.
+        } else {
+            console.error("Hiba az autó hozzáadása során.");
+        }
+    });
+    }
+document.addEventListener('DOMContentLoaded', function() {
+    const raceModeButton = document.getElementById('raceModeButton');
+    const editModeButton = document.getElementById('editModeButton');
+    const addAutoButton = document.getElementById('addAuto');  // ID módosítása
+    const carCheckboxes = document.querySelectorAll('.car-checkbox');
+    const editButtons = document.querySelectorAll('.edit');
+    const deleteButtons = document.querySelectorAll('.btn-danger');
+    const raceButton = document.getElementById('raceButton');
+    const imageUploads = document.querySelectorAll('.image-upload');
+    const replaceImageButtons = document.querySelectorAll('.replace-image');
+
+    
+    raceModeButton.addEventListener('click', function() {
+        // Versenymód aktiválása
+        carCheckboxes.forEach(cb => cb.style.display = 'inline-block');
+        editButtons.forEach(btn => btn.style.display = 'none');
+        deleteButtons.forEach(btn => btn.style.display = 'none');
+        addAutoButton.style.display = 'none';  // ID módosítása
+        raceModeButton.style.display = 'none';
+        editModeButton.style.display = 'inline-block';
+        raceButton.style.display = 'inline-block';
+        imageUploads.forEach(input => input.style.display = 'none');
+        const uploadButtons = document.querySelectorAll('.toggle-upload-form');
+        uploadButtons.forEach(button => {
+        button.style.display = 'none';
+        const raceSound = document.getElementById('raceSound');
+        raceSound.play();
+
+    });
+    });
+
+    editModeButton.addEventListener('click', function() {
+        // Szerkesztési mód aktiválása
+        carCheckboxes.forEach(cb => {
+        cb.style.display = 'none';
+        cb.checked = false;  // Ezzel állítjuk alaphelyzetbe a checkbox állapotát
+
+        const rows = document.querySelectorAll('table tbody tr');
+            rows.forEach(row => {
+                // Megvizsgáljuk, hogy az adott sorban van-e kép
+                const image = row.querySelector('.car-image');
+                
+                // Ha nincs kép a sorban, megjelenítjük a "Képfeltöltés" gombot
+                if (!image || (image && image.style.display === 'none')) {
+                    const uploadButton = row.querySelector('.toggle-upload-form');
+                    if (uploadButton) {
+                        uploadButton.style.display = 'inline-block';
+                    }
+                }
+            });
+
+    });
+
+        carCheckboxes.forEach(cb => cb.style.display = 'none');
+        editButtons.forEach(btn => btn.style.display = 'inline-block');
+        deleteButtons.forEach(btn => btn.style.display = 'inline-block');
+        addAutoButton.style.display = 'inline-block';  // ID módosítása
+        raceModeButton.style.display = 'inline-block';
+        editModeButton.style.display = 'none';
+        raceButton.style.display = 'none';
+        imageUploads.forEach(input => input.style.display = 'block');
+    });
+});
+
+    document.addEventListener('DOMContentLoaded', function() {
+
+    const raceButton = document.getElementById('raceButton');
+    const uploadButtons = document.querySelectorAll('.toggle-upload-form');
+
+    uploadButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const form = this.nextElementSibling;
+            form.style.display = 'block'; // Űrlap megjelenítése
+            this.style.display = 'none'; // Gomb elrejtése
+        });
+    });
+    
+    raceButton.addEventListener('click', function() {
+        const checkedCars = [];
+        const carCheckboxes = document.querySelectorAll('.car-checkbox:checked');
+
+        carCheckboxes.forEach(checkbox => {
+            const row = checkbox.closest('tr');
+            const id = row.dataset.id;
+            const model = row.querySelector('[data-field="model"]').textContent;
+            const manufactureYear = parseInt(row.querySelector('[data-field="manufactureYear"]').textContent);
+            const power = parseInt(row.querySelector('[data-field="power"]').textContent);
+            const weight = parseInt(row.querySelector('[data-field="weight"]').textContent);
+            checkedCars.push({id, model, manufactureYear, power, weight});
+        });
+
+        if (checkedCars.length < 2 || checkedCars.length > 3) {
+            alert('Válassz ki minimum 2, maximum 3 autót a versenyhez!');
+            return;
+        }
+
+        const winner = raceCars(checkedCars);
+            const winningCarRow = document.querySelector(`tr[data-id="${winner.id}"]`);
+            const winningImageElement = winningCarRow.querySelector('.car-image');
+
+            document.getElementById('winnerText').textContent = `A versenyt a következő autó nyerte: ${winner.model}`;
+            const winnerImageInModal = document.getElementById('winnerImage');
+            if (winningImageElement) {
+                winnerImageInModal.src = winningImageElement.src;
+                winnerImageInModal.alt = winner.model;
+                winnerImageInModal.style.display = 'block';
+            } else {
+                winnerImageInModal.style.display = 'none';
+            }
+
+            const winnerModal = new bootstrap.Modal(document.getElementById('winnerModal'));
+            winnerModal.show();
+        });
+});
+
+function raceCars(cars) {
+    cars.sort((a, b) => {
+        const powerWeightA = a.power / a.weight;
+        const powerWeightB = b.power / b.weight;
+
+        if (powerWeightA === powerWeightB) {
+            return b.manufactureYear - a.manufactureYear; // Ha döntetlen, akkor az újabb gyártású autó nyer
+        }
+        return powerWeightB - powerWeightA; // A nagyobb teljesítmény/súly arányú autó nyeri
+    });
+
+    return cars[0]; // Az első autó lesz a nyertes a rendezés után
+}
+
+    document.addEventListener('DOMContentLoaded', function() {
+    const replaceImageButtons = document.querySelectorAll('.toggle-replace-form');
+
+    replaceImageButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const form = this.nextElementSibling; // Referencia az űrlap elemhez
+            form.style.display = form.style.display === 'none' ? 'block' : 'none'; // Az űrlap megjelenítése/elrejtése
+        });
+    });
+});
+
+
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/js/bootstrap.min.js"></script>
+<audio id="raceSound" src="/sound/racesound.mp3"></audio>
+
+
+{% endblock %}
+{% endblock %}
